@@ -289,10 +289,10 @@ public class NumberEP extends ExpansionPattern
     {
         long milliards;
         long millions;
-        int thousands;
+        long thousands;
         int hundreds;
         int tens;
-        int rest;
+        long rest;
         StringBuilder buf = new StringBuilder();
 
         // Special treatment for the 0:
@@ -302,17 +302,21 @@ public class NumberEP extends ExpansionPattern
         if (value < 0) {
             buf.append("meno ");
         }
-        milliards = value / 1000000;
-        rest     = (int) value % 1000000; // the part of value below 1 000 000 000
+        milliards = value / 1000000000;
+        rest     = value % 1000000000; // the part of value below 1 000 000 000
         if (milliards > 1) {
             buf.append(expandInteger(milliards)); // recursive call
             buf.append(" ");
+            if((milliards%1000000)==0)
+            {
+            	buf.append("di ");
+            }
             buf.append("miliardi ");
         } else if (milliards == 1) {
             buf.append("un miliardo ");
         }
         millions = rest / 1000000;
-        rest     = (int) value % 1000000; // the part of value below 1 000 000
+        rest     = value % 1000000; // the part of value below 1 000 000
         if (millions > 1) {
             buf.append(expandInteger(millions)); // recursive call
             buf.append(" ");
@@ -329,7 +333,7 @@ public class NumberEP extends ExpansionPattern
         } else if (thousands == 1) {
             buf.append("mille ");
         }
-        hundreds = rest / 100;
+        hundreds = (int) rest / 100;
         rest     = rest % 100;
         if (hundreds > 1) {
             buf.append(expandInteger(hundreds));
@@ -339,7 +343,7 @@ public class NumberEP extends ExpansionPattern
             buf.append("cento ");
         }
         if (rest >= 20) {
-            tens = rest / 10;
+            tens = (int) rest / 10;
             rest = rest % 10;
             if ( (rest == 1) || (rest == 8) ){
             switch (tens) {
@@ -369,7 +373,7 @@ public class NumberEP extends ExpansionPattern
             }
             	
             }
-            switch (rest) {
+            switch ((int)rest) {
             case 1: buf.append("uno "); break;
             case 2: buf.append("due "); break;
             case 3: buf.append("tre "); break;
@@ -382,7 +386,7 @@ public class NumberEP extends ExpansionPattern
             default: //0: do nothing
             }
         } else { // rest < 20
-            switch (rest) {
+            switch ((int)rest) {
             case 1: buf.append("uno "); break;
             case 2: buf.append("due "); break;
             case 3: buf.append("tre "); break;
