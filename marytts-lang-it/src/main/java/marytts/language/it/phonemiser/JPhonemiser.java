@@ -73,6 +73,20 @@ public class JPhonemiser extends marytts.modules.JPhonemiser {
 			case 'T':
 				pos = "D";
 				break;
+			case 'E':
+				if ((pos.length() > 1) && (pos.charAt(1) == 'A')) {
+					pos = "EA";
+				} else {
+					pos = "E";
+				}
+				break;
+			case 'S':
+				if ((pos.length() > 1) && ( (pos.charAt(1) == 'A') || (pos.charAt(1) == 'W') || (pos.charAt(1) == 'P') )) {
+					pos = pos.substring(0, 2);
+				} else {
+					pos = "S";
+				}
+				break;
 			default:
 				pos = pos.substring(0, 1);
 				break;
