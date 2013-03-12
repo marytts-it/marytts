@@ -167,13 +167,15 @@ public class JPhonemiser extends InternalModule
 						this.removeTrailingOneFromPhones);
 			}
 			// className is null for all lang except italian...    
-		}
+		} 
+		
         // if a syllabifier is not set go with the default  
 		if (syllabifier == null)
 		{
 			syllabifier = new Syllabifier(this.allophoneSet,
 					this.removeTrailingOneFromPhones);
 		}
+		
         lts = new TrainedLTS(allophoneSet, ltsStream, this.removeTrailingOneFromPhones, syllabifier);
     }
 
@@ -250,17 +252,30 @@ public class JPhonemiser extends InternalModule
                     while (st.hasMoreTokens()) {
                         String graph = st.nextToken();
                         StringBuilder helper = new StringBuilder();
-                        String phon = this.phonemiseComplete(privatedict, graph, pos, helper);
-                        if (ph.length() == 0) { // first part
-                            // The g2pMethod of the combined beast is
-                            // the g2pMethod of the first constituant.
-                            g2pMethod = helper.toString();
-                            ph.append(phon);
-                        } else { // following parts
-                            ph.append(" - ");
-                            // Reduce primary to secondary stress:
-                            ph.append(phon.replace('\'', ','));
-                       }
+                        String phon = null;
+                        if(privatedict != null)
+                        {
+                        	phon = this.dictLookup(privatedict, graph, pos);
+                            if (phon != null) {
+                                helper.append("privatedict");
+                            }
+                        }
+                        if(phon==null)
+                        {
+                        	phon = this.phonemise(graph, pos, helper);
+                        }
+                        //if(phon!=null){
+	                        if (ph.length() == 0) { // first part
+	                            // The g2pMethod of the combined beast is
+	                            // the g2pMethod of the first constituant.
+	                            g2pMethod = helper.toString();
+	                            ph.append(phon);
+	                        } else { // following parts
+	                            ph.append(" - ");
+	                            // Reduce primary to secondary stress:
+	                            ph.append(phon.replace('\'', ','));
+	                       }
+                       //}
                     }
                     
                     if (ph != null && ph.length() > 0) {
@@ -313,22 +328,22 @@ public class JPhonemiser extends InternalModule
         // First, try a simple userdict and lexicon lookup:
 
         String result = this.phonemiseLookupOnly(privatedict, text, pos, g2pMethod);
-        if (result != null) {
-            return result;
-        }
+		if (result != null) {
+			return result;
+		}
 
-        // Cannot find it in the lexicon -- apply letter-to-sound rules
-        // to the normalised form
+		// Cannot find it in the lexicon -- apply letter-to-sound rules
+		// to the normalised form
 
-        String phones = lts.predictPronunciation(text);
-        result = lts.syllabify(phones);
-        if (result != null) {
-            g2pMethod.append("rules");
-            return result;
-        }
+		String phones = lts.predictPronunciation(text);
+		result = lts.syllabify(phones);
+		if (result != null) {
+			g2pMethod.append("rules");
+			return result;
+		}
 
-        return null;
-    }
+		return null;
+	}
 
 	/**
 	 * Phonemise the word text. This starts with a simple lexicon lookup,
