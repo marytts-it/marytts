@@ -1,6 +1,7 @@
 package marytts.tools.dbselection;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -46,6 +47,8 @@ public class FeatureMakerAddExternal extends FeatureMaker {
 	        /* Here the DB connection is open */
 	        wikiToDB = new DBHandler(locale);
 	        wikiToDB.createDBConnection(mysqlHost,mysqlDB,mysqlUser,mysqlPasswd);
+	        
+	        oovwordPrintWriter = new PrintWriter(new BufferedWriter(new FileWriter("oovwords"+ dateStringIni + ".txt", true)));
 
 	        // check if table exists, if exists already ask user if delete or re-use
 	        char c;
@@ -127,6 +130,7 @@ public class FeatureMakerAddExternal extends FeatureMaker {
 	            } //end of loop over articles  
 	            
 	            wikiToDB.closeDBConnection();
+	            oovwordPrintWriter.close();
 
 	            Date dateEnd = new Date();
 	            dateStringEnd = fullDate.format(dateEnd);
