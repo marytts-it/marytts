@@ -2041,8 +2041,7 @@ public class DBHandler {
 	 */
 	public boolean textSentenceIsContainedInSelectedIdSents(int candidateId, Set<Integer> selectedIdSents, Set<Integer> unwantedIdSents) {
 		int equal = 0;
-		for (Integer selectedId : selectedIdSents) {
-			//System.out.println("candidateId "+ candidateId + " selectedId " + selectedId);
+		for (int selectedId : selectedIdSents) {
 			try {
 				psCountEqualText.setInt(1, candidateId);
 				psCountEqualText.setInt(2, selectedId);
@@ -2062,9 +2061,9 @@ public class DBHandler {
 				unwantedIdSents.add(candidateId);
 				//System.out.println("Add candidateId: " + candidateId + " in unwantedIdSents. unwantedIdSents.size() = " + unwantedIdSents.size());
 				return true;
-			} else
-				return false;
+			} 
 		}
+		// For loop ends without founding equal sentence 
 		return false;
 	}
 
