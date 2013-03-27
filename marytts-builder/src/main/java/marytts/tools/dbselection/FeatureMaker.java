@@ -21,6 +21,7 @@ package marytts.tools.dbselection;
 
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -101,6 +102,7 @@ public class FeatureMaker
     protected static String mysqlUser=null;
     protected static String mysqlPasswd=null;
   
+    protected static PrintWriter oovwordPrintWriter;
     
     public static void main(String[] args)throws Exception{
         boolean test=false;	
@@ -121,6 +123,7 @@ public class FeatureMaker
         /* Here the DB connection is open */
         wikiToDB = new DBHandler(locale);
         wikiToDB.createDBConnection(mysqlHost,mysqlDB,mysqlUser,mysqlPasswd);
+        oovwordPrintWriter = new PrintWriter(new BufferedWriter(new FileWriter("oovwords"+ dateStringIni + ".txt", true)));
 
         // check if table exists, if exists already ask user if delete or re-use
         char c;
@@ -198,7 +201,8 @@ public class FeatureMaker
             } //end of loop over articles  
             
             wikiToDB.closeDBConnection();
-
+            oovwordPrintWriter.close();
+            
             Date dateEnd = new Date();
             dateStringEnd = fullDate.format(dateEnd);
             System.out.println("numSentencesInText=" + numSentences);
@@ -878,6 +882,8 @@ public class FeatureMaker
                             //method other than lexicon or userdict -> unreliable
                             newUsefulSentence = 1;
                             //System.out.println("  unknownwords: method other than lexicon or userdict -> unreliable");
+							oovwordPrintWriter.println(t.getTextContent());
+
                         } else {
                             //lax credibility criterion
                             if (!method.equals("phonemiseDenglish") && !method.equals("compound") && !method.equals("rules")){ // NEW: method is rules
