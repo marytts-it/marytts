@@ -800,10 +800,32 @@ public class FeatureMaker
                         //just append without whitespace
                         sentence.append(tokenText);
                         //System.out.println(sentence);
-                    } else if ( "'(".indexOf(sentence.substring(sentence.length() - 1)) != -1 ) { 
-                    	// if last char of sentence is apostrophe
+                    } else if ( "(".indexOf(sentence.substring(sentence.length() - 1)) != -1 ) { 
+                    	// if last char of sentence is an open parenthesis 
                     	sentence.append(tokenText);
-                    }
+                    } else if  	// if last char of sentence is an apostrophe
+                    		( "'".indexOf(sentence.substring(sentence.length() - 1)) != -1 ) //&&  
+                    		// and the previous node parent accent is last-proclitics
+						{
+							// CASE 1: simple last proclitics: dell'amore
+							if ((((Element) (nextToken.getPreviousSibling())) != null)
+									&& (((Element) nextToken.getPreviousSibling()
+											.getParentNode()).getAttribute("accent") == "last-proclitics"))
+								sentence.append(tokenText);
+							// CASE 2: numbers last proclitics: l'11
+							else if ((((Element) (nextToken.getParentNode())) != null)
+									&& (((Element) (nextToken.getParentNode()
+											.getPreviousSibling())) != null)
+									&& (((Element) (nextToken.getParentNode()
+											.getPreviousSibling().getParentNode())) != null)
+									&& (((Element) nextToken.getParentNode()
+											.getPreviousSibling().getParentNode())
+											.getAttribute("accent") == "last-proclitics"))
+								sentence.append(tokenText);
+							// CASE 3: the others cases: po', vo' ...
+							else
+								sentence.append(" " + tokenText);
+						}
                     else {
                         //normal word or open parenthesis, append a whitespace before it
                         //word = MaryDomUtils.tokenText((Element)nextToken);
