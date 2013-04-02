@@ -1,13 +1,15 @@
 #! /bin/octave -qf
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% pitch_statistics.sh
+% pitch_statistics.m
 % Author: Fabio Tesser
 % Email: fabio.tesser@gmail.com
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 printf ("%s\n", program_name ());
 arg_list = argv ();
+
+pkg load nan;
 
 filename=arg_list{1};
 epsfilename=sprintf("%s_pitch_statistics.eps",filename);
