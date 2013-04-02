@@ -383,7 +383,7 @@ public class HTSVocoder {
       mixedExcitation = htsData.getUseMixExc();
       fourierMagnitudes = htsData.getUseFourierMag();
          
-      if( mixedExcitation && htsData.getPdfStrStream() != null ) {  
+      if( mixedExcitation ) { //&& htsData.getPdfStrStream() != null ) { //TODO-Fabio: Note: why this was necessary?
         numM = htsData.getNumFilters();
         orderM = htsData.getOrderFilters();
         
@@ -1704,7 +1704,7 @@ public class HTSVocoder {
      *     @param strVsize: vector size (15 if using a file from a hmm voice training data, it can be found in data/filters/mix_excitation_filters.txt, otherwise specify)
      *     @param filtersFile: filename 
      *     @param numFilters: 5 (if using the filters file used in the HTS-MARY demo, otherwise specify)
-     *     @param orderFilters: 48 (if using the filters file used in the HTS-MARY demo, otherwise specify)
+     *     ////@param orderFilters: 48 (if using the filters file used in the HTS-MARY demo, otherwise specify) //TODO-Fabio: Note: also this should not be necessary anymore.
      * 
      *     <p>if using Fourier magnitudes: <p>
      *     @param magFile: filename
@@ -1836,24 +1836,27 @@ public class HTSVocoder {
       
        // last argument true or false to play the file
        boolean play = Boolean.parseBoolean(args[ind++]);
-       
-       boolean trans = true;       
-       if(args[ind].contentEquals("loud")){
-           f0Trans = f0LoudFemale;
-           strTrans = strLoudFemale;
-           magTrans = magLoudFemale;
-           mcepTrans = mcepLoudFemale;
-           System.out.println("Generating loud voice");
-         } else if(args[ind].contentEquals("soft")) {
-           f0Trans = f0SoftFemale;
-           strTrans = strSoftFemale;
-           magTrans = magSoftFemale;
-           mcepTrans = mcepSoftFemale;
-           System.out.println("Generating soft voice");
-         } else {
-            trans = false;
-            System.out.println("Generating modal voice");
-         }
+
+       //TODO-FABIO: to check.
+       boolean trans = true;
+		if (args.length > ind) {
+			if (args[ind].contentEquals("loud")) {
+				f0Trans = f0LoudFemale;
+				strTrans = strLoudFemale;
+				magTrans = magLoudFemale;
+				mcepTrans = mcepLoudFemale;
+				System.out.println("Generating loud voice");
+			} else if (args[ind].contentEquals("soft")) {
+				f0Trans = f0SoftFemale;
+				strTrans = strSoftFemale;
+				magTrans = magSoftFemale;
+				mcepTrans = mcepSoftFemale;
+				System.out.println("Generating soft voice");
+			} else {
+				trans = false;
+				System.out.println("Generating modal voice");
+			}
+		}
        
        //Change these for voice effects:
        //                                                                   [min][max]
@@ -2100,7 +2103,7 @@ public class HTSVocoder {
         vocoder.htsMLSAVocoderCommand(args3);
         */
         
-        String path = "/project/mary/marcela/HMM-voices/arctic_slt/hts/data/";
+        /*String path = "/project/mary/marcela/HMM-voices/arctic_slt/hts/data/";
         String fileName = "modal0002";
         //String fileName = "de_0001";
         String args4[] = {"0", "0.42", "0.05", "0.25", "16000", "80", 
@@ -2111,8 +2114,33 @@ public class HTSVocoder {
                           path + "filters/mix_excitation_filters.txt", "5", 
                           path + "mag/" + fileName + ".mag", "30", "true", "soft"};                 
         HTSVocoder vocoder = new HTSVocoder();
+        vocoder.htsMLSAVocoderCommand(args4);*/
+        
+        // The following is a test 
+        /*
+        String path = "/home/fabio/tests/HTS_AuToBI/cmu_us_bdl_arctic_mary_voice_0/hts/data/";
+        String basename = "arctic_a0558";
+        String args3[] = {"0", "0.42", "1", "0.15", "16000", "80", 
+                          path + "mgc/" + basename + ".mgc",  "75", 
+                          path + "lf0/" + basename + ".lf0", "3", 
+                          "gen-MixExc-" + basename + ".wav", 
+                          path + "str/" + basename + ".str", "15", 
+                          path + "filters/mix_excitation_5filters_99taps_16Kz.txt", "5", "false"};                 
+        HTSVocoder vocoder = new HTSVocoder();
+        vocoder.htsMLSAVocoderCommand(args3);
+        
+        
+        //String path = "/home/fabio/tests/HTS_AuToBI/cmu_us_bdl_arctic_mary_voice_0/hts/data/";
+        //String basename = "arctic_a0558";
+        String args4[] = {"0", "0.42", "1", "0.15", "16000", "80", 
+                          path + "mgc/" + basename + ".mgc",  "75", 
+                          path + "lf0/" + basename + ".lf0", "3", 
+                          "gen-NoMixExc-" + basename + ".wav", 
+                          "false"};                 
+        vocoder = new HTSVocoder();
         vocoder.htsMLSAVocoderCommand(args4);
-                
+        */
+        
         
         /* Use this for running HTSVocoder for a list, see vocoderList for the parameters */  
         
@@ -2120,6 +2148,9 @@ public class HTSVocoder {
         vocoder.vocoderList(args);
         */
         
+		// This use the args from command line
+        HTSVocoder vocoder = new HTSVocoder();
+        vocoder.htsMLSAVocoderCommand(args);
     }
     
     public void vocoderList(String[] args) throws IOException, InterruptedException, Exception{
