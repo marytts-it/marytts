@@ -58,7 +58,7 @@ public class CompositeEP extends ExpansionPattern
     
     Pattern reLettersDigitsAndApostrophe =
         Pattern.compile("([^']*[A-ZÀÁÈÉÌÍÒÓÙÚa-zàáèéìíòóùú0-9][^']*)('[^']*[A-ZÀÁÈÉÌÍÒÓÙÚa-zàáèéìíòóùú0-9][^']*)+");
-    
+
     // this can be used for dell' un' etc..
       /* Pattern reLettersAndApostrophe =
             //Pattern.compile("([^']*[A-ZÀÁÈÉÌÍÒÓÙÚa-zàáèéìíòóùú][^']*)('[^']*[A-ZÀÁÈÉÌÍÒÓÙÚa-zàáèéìíòóùú][^']*)+");
@@ -69,9 +69,9 @@ public class CompositeEP extends ExpansionPattern
     Pattern reOneLetterAndApostrophe =
     		Pattern.compile("([^']*[^EIOUYaeiouyÀÁÈÉÌÍÒÓÄÖÜËÏäöüëïÙÚàáèéìíòóùú])('[hH]?([AEIOUYaeiouyÀÁÈÉÌÍÒÓÄÖÜËÏäöüëïÙÚàáèéìíòóùú0-9][^']*)+)+");
     
-    // Both letters and digits, in any order:
+    // Both letters or apostrophes and digits, in any order:
     Pattern reLettersAndDigits = Pattern.compile
-        ("(?:(?:[A-ZÀÁÈÉÌÍÒÓÙÚa-zàáèéìíòóùú]+[0-9]+)|(?:[0-9]+[A-ZÀÁÈÉÌÍÒÓÙÚa-zàáèéìíòóùú]+))[A-ZÄÖÜa-zàáèéìíòóùú0-9]*");
+        ("(?:(?:[A-ZÀÁÈÉÌÍÒÓÙÚa-zàáèéìíòóùú']+[0-9]+)|(?:[0-9]+[A-ZÀÁÈÉÌÍÒÓÙÚa-zàáèéìíòóùú']+))[A-ZÄÖÜa-zàáèéìíòóùú0-9]*");
 
     public List knownTypes() { return new ArrayList(); }
 
