@@ -45,38 +45,43 @@ public class Syllabifier extends marytts.modules.phonemiser.Syllabifier
      */
     protected void correctStressSymbol(LinkedList<String> phoneList)
     {
-        boolean stressFound = false;
-        ListIterator<String> it = phoneList.listIterator(0);
-        while (it.hasNext()) {
+		int stress_index = -1;
+		ListIterator<String> it = phoneList.listIterator(0);
+		while (it.hasNext()) {
 			String s = it.next();
 			if (s.endsWith("1")) {
 				if (this.removeTrailingOneFromPhones) {
 					it.set(s.substring(0, s.length() - 1)); // delete "1"
 				}
-				if (!stressFound) {
-					// Only add a stress marker for first occurrence of "1":
-                    // Search backwards for syllable boundary or beginning of word:
-                    int steps = 0;
-                    while (it.hasPrevious()) {
-                        steps++;
-                        String t = it.previous();
-                        if (t.equals("-") || t.equals("_")) { // syllable boundary
-                            it.next();
-                            steps--;
-                            break;
-                        }
-                    }
-                    it.add("'");
-                    while (steps > 0) {
-                        it.next();
-                        steps--;
-                    }
-                    stressFound = true;
-                }
-            }
-        }
-        // No stressed vowel in word?
-        if (!stressFound) {
+				if (stress_index != -1) {
+					String t = phoneList.get(stress_index);
+					if (t.equals("E1")) {
+						phoneList.set(stress_index, "e");
+
+					} else if (t.equals("O1")) {
+						phoneList.set(stress_index, "o");
+
+					} else {
+						phoneList.set(stress_index,
+								t.substring(0, t.length() - 1));
+					}
+
+				}
+				stress_index = it.nextIndex() - 1;
+			}
+		}
+		if (stress_index != -1) {
+			it = phoneList.listIterator(stress_index);
+			while (it.hasPrevious()) {
+				String t = it.previous();
+				if (t.equals("-") || t.equals("_")) { // syllable boundary
+					it.next();
+					break;
+				}
+			}
+			it.add("'");
+		} else {
+			// No stressed vowel in word?
             // if the word does not end with a vowel and last syllable contains a vowel, stress the last syllable
         	// otherwise stress the second last syllable (or none)
 			it = phoneList.listIterator();
