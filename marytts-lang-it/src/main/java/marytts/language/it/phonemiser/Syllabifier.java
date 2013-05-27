@@ -31,8 +31,8 @@ import marytts.modules.phonemiser.AllophoneSet;
 
 public class Syllabifier extends marytts.modules.phonemiser.Syllabifier
 {
-    
     private Map<String,String> unstress_map = null;
+    private Map<String,String> stress_map = null;
     private static Map<String,String> initUnstressMap(AllophoneSet allophoneSet){
 		Map<String,String> unstress_map = new HashMap<String,String>();
 		for (Iterator<String> iterator = allophoneSet.getAllophoneNames()
@@ -99,21 +99,97 @@ public class Syllabifier extends marytts.modules.phonemiser.Syllabifier
 		}
 		return unstress_map;
     }
+    private static Map<String,String> initStressMap(AllophoneSet allophoneSet){
+		Map<String,String> stress_map = new HashMap<String,String>();
+		for (Iterator<String> iterator = allophoneSet.getAllophoneNames()
+				.iterator(); iterator.hasNext();) {
+			String ph_a = iterator.next();
+			Allophone a = allophoneSet.getAllophone(ph_a);
+			if (a.isVowel()) {
+				Map<String, String> a_features = a.getFeatures();
+				String a_stressed = a_features.get("stressed");
+				if ((a_stressed == null) || (!a_stressed.equals("+"))) {
+					int a_vheight = -1;
+					try {
+						a_vheight = Integer.parseInt(a_features.get("vheight"));
+					} catch (Exception e) {
+					}
+					int last_b_vheight = Integer.MAX_VALUE;
+					for (Iterator<String> n_iterator = allophoneSet
+							.getAllophoneNames().iterator(); n_iterator
+							.hasNext();) {
+						String ph_b = n_iterator.next();
+						Allophone b = allophoneSet.getAllophone(ph_b);
+						boolean change_to_b = true;
+						if (b.isVowel()) {
+							Map<String, String> b_features = b.getFeatures();
+							String b_stressed = b_features.get("stressed");
+							if ((b_stressed == null)
+									|| (!b_stressed.equals("+"))) {
+								change_to_b = false;
+							} else {
+								for (String s : b_features.keySet()) {
+									if (!s.equals("stressed")) {
+										if (!b_features.get(s).equals(
+												a_features.get(s))) {
+											if (s.equals("vheight")) {
+												int b_vheight = -1;
+												try {
+													b_vheight = Integer.parseInt(b_features.get("vheight"));
+												} catch (Exception e) {
+												}
+												if( (b_vheight <= last_b_vheight) && (b_vheight >= a_vheight) ){
+													last_b_vheight = b_vheight;
+												}
+												else{
+													change_to_b = false;
+												}
+											} else {
+												change_to_b = false;
+											}
+										}
+									}
+								}
+							}
+							if (change_to_b) {
+								stress_map.put(ph_a, ph_b);
+							}
+						}
+					}
+				} else {
+					stress_map.put(ph_a, ph_a);
+				}
+			} else {
+				stress_map.put(ph_a, ph_a);
+			}
+		}
+		return stress_map;
+    }
     
     public Syllabifier(AllophoneSet allophoneSet, boolean removeTrailingOneFromPhones)
     {
     	super(allophoneSet, removeTrailingOneFromPhones);
     	this.unstress_map = Syllabifier.initUnstressMap(allophoneSet);
+    	this.stress_map = Syllabifier.initStressMap(allophoneSet);
     }
     
     public Syllabifier(AllophoneSet allophoneSet)
     {
     	super(allophoneSet);
     	this.unstress_map = Syllabifier.initUnstressMap(allophoneSet);
+    	this.stress_map = Syllabifier.initStressMap(allophoneSet);
     }
 
 	private String unstress_phone(String ph) {
 		String ret = this.unstress_map.get(ph);
+		if (ret == null) {
+			return ph;
+		}
+		return ret;
+	}
+
+	private String stress_phone(String ph) {
+		String ret = this.stress_map.get(ph);
 		if (ret == null) {
 			return ph;
 		}
@@ -197,6 +273,10 @@ public class Syllabifier extends marytts.modules.phonemiser.Syllabifier
 			}
 			if(syllableToStressIndex > -1){
 				it = phoneList.listIterator(syllableToStressIndex);
+					if(syllableToStressIndex > -1){
+					phoneList.set(syllableToStressIndex,this.stress_phone(phoneList.get(syllableToStressIndex)));
+				}
+				stress_index = it.nextIndex() - 1;
 				while (it.hasPrevious()) {
 					s = it.previous();
 					if (s != null) {
