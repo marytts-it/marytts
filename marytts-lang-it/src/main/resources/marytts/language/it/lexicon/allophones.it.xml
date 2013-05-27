@@ -15,10 +15,10 @@
 	<!-- Stressed and unstressed vowels -->
 	<vowel ph="i" vheight="1" vfront="1" vrnd="-" stressed="-" />
 	<vowel ph="e" vheight="2" vfront="1" vrnd="-" stressed="-" />
-	<vowel ph="E" vheight="3" vfront="1" vrnd="-" stressed="-" />
+	<!-- <vowel ph="E" vheight="3" vfront="1" vrnd="-" stressed="-" /> -->
 	<vowel ph="a" vheight="4" vfront="2" vrnd="-" stressed="-" />
 	<vowel ph="o" vheight="2" vfront="3" vrnd="+" stressed="-" />
-	<vowel ph="O" vheight="3" vfront="3" vrnd="+" stressed="-" />
+	<!-- <vowel ph="O" vheight="3" vfront="3" vrnd="+" stressed="-" /> -->
 	<vowel ph="u" vheight="1" vfront="3" vrnd="+" stressed="-" />
 	<vowel ph="i1" vheight="1" vfront="1" vrnd="-" stressed="+" />
 	<vowel ph="e1" vheight="2" vfront="1" vrnd="-" stressed="+" />
