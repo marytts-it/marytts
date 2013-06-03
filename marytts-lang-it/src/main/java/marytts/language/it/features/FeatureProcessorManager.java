@@ -75,11 +75,13 @@ public class FeatureProcessorManager extends
 
 			// set the targets 
 			MaryGenericFeatureProcessors.TargetElementNavigator syllable = new MaryGenericFeatureProcessors.SyllableNavigator();
-			
+			MaryGenericFeatureProcessors.TargetElementNavigator sentence = new MaryGenericFeatureProcessors.SentenceNavigator();
 			
 			// override of the following 
 			addFeatureProcessor(new MaryGenericFeatureProcessors.Selection_Prosody(syllable));
-
+			
+			// add sentence_type features ... is that necessary ? should be better the POS of the first sentence word?  
+			addFeatureProcessor(new MaryGenericFeatureProcessors.SentenceType(sentence));
 
 		} catch (Exception e) {
 			e.printStackTrace();
