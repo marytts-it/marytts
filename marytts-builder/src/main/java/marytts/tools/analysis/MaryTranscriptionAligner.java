@@ -214,13 +214,27 @@ public class MaryTranscriptionAligner extends TranscriptionAligner {
 	                    }
 	                    String[] newPh = alignments[iAlign].trim().split("\\s+");
 	                    for (int i=0; i<newPh.length; i++) {
+	                    	if ((i==newPh.length-1) && (newPh[i].trim().equals(possibleBnd)))
+	                    	{
+	                    		// if it is the last and it is a possibleBnd
+	                    	        // Need to insert a boundary before token
+	        	                    System.err.println("  inserted boundary in xml");
+	        	                    Element b = MaryXML.createElement(doc, MaryXML.BOUNDARY);
+	        	                    b.setAttribute("breakindex", "3");
+	        	                    if (insertDummyDurations) {
+	        	                    	b.setAttribute("duration", "1");
+	        	                    }
+	        	                    token.getParentNode().insertBefore(b, token);
+	                    	
+	                    	} else {
 	                        Element newPhElement = MaryXML.createElement(doc, MaryXML.PHONE);
 	                        newPhElement.setAttribute("p", newPh[i]);
 	                        syllable.insertBefore(newPhElement, ref);
 	                        System.err.println(" inserted phone from transcription: "+newPh[i]);
-	                        if (insertDummyDurations) {
-	                        	newPhElement.setAttribute("d", "1");
-	                        }
+	                         if (insertDummyDurations) {
+	                         	newPhElement.setAttribute("d", "1");
+	                         }
+	                    	}
 	                    }
 	                } // else it is an empty word boundary marker
 	                iAlign++; // move beyond the marker between tokens
@@ -287,6 +301,7 @@ public class MaryTranscriptionAligner extends TranscriptionAligner {
 	    StringBuilder tPh = new StringBuilder();
 	    TreeWalker sylWalker = MaryDomUtils.createTreeWalker(token, MaryXML.SYLLABLE);
 	    Element syl;
+	    // TODO: FABIO change the stress accordly to new pronunciations...
 	    while ((syl = (Element) sylWalker.nextNode()) != null) {
 	        StringBuilder sylPh = new StringBuilder();
 	        StringBuilder sylPh_nostress = new StringBuilder();

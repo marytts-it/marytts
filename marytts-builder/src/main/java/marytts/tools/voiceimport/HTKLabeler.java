@@ -31,6 +31,7 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +39,7 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.StringTokenizer;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -49,9 +51,13 @@ import javax.xml.xpath.XPathFactory;
 
 import marytts.client.MaryClient;
 import marytts.exceptions.MaryConfigurationException;
+import marytts.fst.FSTLookup;
 import marytts.modules.phonemiser.Allophone;
 import marytts.modules.phonemiser.AllophoneSet;
+import marytts.server.Mary;
 import marytts.util.io.FileUtils;
+
+import org.apache.commons.collections.set.ListOrderedSet;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -84,12 +90,14 @@ public class HTKLabeler extends VoiceImportComponent {
         protected String maryOutputType;
         protected int percent = 0;
         protected File promtallophonesDir;
-        protected Map<String, TreeMap<String, String>> dictionary;
+        Collection<String> HTKdictionary;
+        protected FSTLookup lexicon;
         protected AllophoneSet allophoneSet;
         protected int MAX_ITERATIONS = 150;
         protected int MAX_SP_ITERATION = 10; // iteration when intra word forced pauses (ssil) are inserted
-        protected int MAX_VP_ITERATION = 20; // iteration when virtual pauses (sp) are inserted
-        protected int MAX_MIX_ITERATION = 30; // iteration when mixtures are increased
+        protected int MAX_VP_ITERATION = 35; // iteration when virtual pauses (sp) are inserted
+        protected int MAX_FA_ITERATION = 50; // iteration when forced alignement with multiple pronunciation is done
+        protected int MAX_MIX_ITERATION = 70; // iteration when mixtures are increased
         
         protected int noIterCompleted = 0;
         
@@ -112,7 +120,7 @@ public class HTKLabeler extends VoiceImportComponent {
         private ArrayList<Double> logProbFrame_array = new ArrayList<Double>();
         private ArrayList<Double> epsilon_array = new ArrayList<Double>();
         private int PHASE_NUMBER =0; 
-        private double[] epsilon_PHASE = {0.2, 0.05, 0.001, 0.0005}; // 0 1 2 3
+        private double[] epsilon_PHASE = {0.2, 0.05, 0.01, 0.0005, 0.0001}; // 0 1 2 3 4
         
          
         public final String getName(){
@@ -169,8 +177,9 @@ public class HTKLabeler extends VoiceImportComponent {
         public void initialiseComp() 
         {
            
-           dictionary = new TreeMap<String, TreeMap<String,String>>();
-           
+           //dictionary = new TreeMap<String, TreeMap<String,String>>(); // Unused?
+           HTKdictionary = new TreeSet<String>();
+
            promtallophonesDir = new File(getProp(PROMPTALLOPHONESDIR));
            if (!promtallophonesDir.exists()){
                System.out.print(PROMPTALLOPHONESDIR+" "+getProp(PROMPTALLOPHONESDIR)
@@ -220,6 +229,8 @@ public class HTKLabeler extends VoiceImportComponent {
             createPhoneDictionary();
             // Extract phone sequence from prompt_allophones files
             getPhoneSequence();
+            
+            saveHTKWordDictionary();
 	    
             // This is necessary to remove multiple sp: TODO: implement a loop and check the result 
             delete_multiple_sp_in_PhoneMLFile(getProp(HTDIR) + File.separator + "etc" + File.separator + "htk.phones3.mlf",
@@ -235,7 +246,23 @@ public class HTKLabeler extends VoiceImportComponent {
                     getProp(HTDIR) + File.separator + "etc" + File.separator + "htk.phones7.mlf");
 
             delete_multiple_sp_in_PhoneMLFile(getProp(HTDIR) + File.separator + "etc" + File.separator + "htk.phones7.mlf",
-                    getProp(HTDIR) + File.separator + "etc" + File.separator + "htk.phones3.mlf"); 
+                    getProp(HTDIR) + File.separator + "etc" + File.separator + "htk.phones3.mlf");
+            
+            delete_multiple_sp_in_PhoneMLFile(getProp(HTDIR) + File.separator + "etc" + File.separator + "htk.words3.mlf",
+                    getProp(HTDIR) + File.separator + "etc" + File.separator + "htk.words4.mlf"); 
+
+            delete_multiple_sp_in_PhoneMLFile(getProp(HTDIR) + File.separator + "etc" + File.separator + "htk.words4.mlf",
+                    getProp(HTDIR) + File.separator + "etc" + File.separator + "htk.words5.mlf"); 
+
+            delete_multiple_sp_in_PhoneMLFile(getProp(HTDIR) + File.separator + "etc" + File.separator + "htk.words5.mlf",
+                    getProp(HTDIR) + File.separator + "etc" + File.separator + "htk.words6.mlf"); 
+
+            delete_multiple_sp_in_PhoneMLFile(getProp(HTDIR) + File.separator + "etc" + File.separator + "htk.words6.mlf",
+                    getProp(HTDIR) + File.separator + "etc" + File.separator + "htk.words7.mlf"); 
+
+            delete_multiple_sp_in_PhoneMLFile(getProp(HTDIR) + File.separator + "etc" + File.separator + "htk.words7.mlf",
+                    getProp(HTDIR) + File.separator + "etc" + File.separator + "htk.words3.mlf"); 
+
             
             //part 2: Feature Extraction using HCopy
             System.out.println("Feature Extraction:");
@@ -252,8 +279,35 @@ public class HTKLabeler extends VoiceImportComponent {
             System.out.println("... Done.");
             
             //Part 5: Force align with HVite 
-            System.out.println("HTK Align:");
+            /*System.out.println("HTK Align:");
             hviteAligning();
+            System.out.println("... Done.");*/
+            
+            //Part 5: Force align with HVite 
+            System.out.println("HTK Align:");
+            String logfile= "log_hviteMultiplePronunciationAligning_"+"final-full"+".txt";
+            String labDir = getProp(HTDIR)+File.separator+"lab";
+            String alignedMlf = getProp(HTDIR)+File.separator+"aligned_full_final.mlf";
+            hviteMultiplePronunciationAligning("hmm"+"-final", alignedMlf, false, labDir, true, logfile);
+            
+            logfile= "log_hviteMultiplePronunciationAligning_"+"final-phones"+".txt";
+            alignedMlf = getProp(HTDIR)+File.separator+"aligned.mlf";
+            hviteMultiplePronunciationAligning("hmm"+"-final", alignedMlf, false, labDir, false, logfile);
+            
+            // write the lab files
+            logfile= "log_hviteMultiplePronunciationAligning_"+"final-full2"+".txt";
+            alignedMlf = "";
+            labDir = getProp(HTDIR)+File.separator+"htk-full"+File.separator+"wrd";
+            hviteMultiplePronunciationAligning("hmm"+"-final", alignedMlf, true, labDir, true, logfile);
+            
+         
+            logfile= "log_hviteMultiplePronunciationAligning_"+"final-phones"+".txt";
+            alignedMlf = "";
+            labDir = getProp(HTDIR)+File.separator+"htk-full"+File.separator+"lab";
+            hviteMultiplePronunciationAligning("hmm"+"-final", alignedMlf, true, labDir, false, logfile);
+            
+            
+            
             System.out.println("... Done.");
             
             //Part 6: Extra model statistics
@@ -271,7 +325,71 @@ public class HTKLabeler extends VoiceImportComponent {
         }
         
         
-       /**
+       private void saveHTKWordDictionary() throws Exception {
+    	   
+    	   
+    	   String dict0 = outputDir+File.separator+"htk.words0.dict";
+    	   String dict = outputDir+File.separator+"htk.words.dict";
+    	   PrintWriter wordDictOut = new PrintWriter(
+                   new FileOutputStream (new File(dict0)));
+    	   
+    	   HTKdictionary.add("sil sil");
+    	   HTKdictionary.add("ssil ssil");
+    	   HTKdictionary.add("sp sp");
+
+    	   Iterator<String> itr = HTKdictionary.iterator();
+    	    while(itr.hasNext()){
+    	    	wordDictOut.println(itr.next());
+    	    }
+   	   
+    	    wordDictOut.flush();
+    	    wordDictOut.close();
+    	    
+    	    String fileded = getProp(HTDIR) +File.separator+"config"+File.separator+ "dict.ded";
+    	    PrintWriter dedDictOut = new PrintWriter(
+    	    		new FileOutputStream (new File(fileded)));
+    	    
+    	    
+    	    dedDictOut.println("AS sp");
+    	    dedDictOut.println("MP sil sil sp");
+    	    dedDictOut.println("MP ssil ssil sp");
+    	    dedDictOut.println("MP sp sp sp");
+    	    
+    	    dedDictOut.flush();
+    	    dedDictOut.close();
+    	    
+    	    
+    	    Runtime rtime = Runtime.getRuntime();
+            //get a shell
+            Process process = rtime.exec("/bin/bash");
+            //get an output stream to write to the shell
+            
+            //when no sp use (-m)!
+            
+            String hdman = getProp(HTKDIR)+File.separator+"HDMan";
+            
+            PrintWriter pw = new PrintWriter(
+                    new OutputStreamWriter(process.getOutputStream()));
+            
+            String cmd = "( cd "+getProp(HTDIR) +"; " 
+            + hdman + " -g " + fileded +  " " + dict + " " + dict0
+            +"; exit )\n";
+            
+            System.out.println(cmd);
+            pw.println(cmd);
+            
+            pw.flush();
+            //shut down
+            pw.close();
+            process.waitFor();
+             // check exit value
+            if (process.exitValue() != 0) {
+                BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
+                throw new MaryConfigurationException(errorReader.readLine());
+            }
+		}
+
+	/**
         * Setup the HTK directory
         * @throws IOException, InterruptedException
      * @throws MaryConfigurationException 
@@ -294,6 +412,8 @@ public class HTKLabeler extends VoiceImportComponent {
                     +"; mkdir -p feat"
                     +"; mkdir -p config"
                     +"; mkdir -p lab"
+                    +"; mkdir -p htk-full/lab"
+                    +"; mkdir -p htk-full/wrd"
                     +"; exit )\n");
             pw.flush();
             //shut down
@@ -304,6 +424,17 @@ public class HTKLabeler extends VoiceImportComponent {
                 BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
                 throw new MaryConfigurationException(errorReader.readLine());
             }
+            
+			// TODO: temporary: at the moment fix path to load the dictionary
+            lexicon = new FSTLookup(new FileInputStream("/home/fabio/voice_building_5_0/marytts-it/marytts-lang-it/src/main/resources/marytts/language/it/lexicon/it_lexicon.fst"), 
+            		"it_lexicon.fst");
+            
+          /*  System.out.print("Starting builtin MARY TTS...");
+            Mary.startup();
+            System.out.println(" MARY TTS started.");
+            
+            e poi 
+            */    
             
         }
        
@@ -857,6 +988,7 @@ public class HTKLabeler extends VoiceImportComponent {
             int BEST_ITERATION = MAX_ITERATIONS; 
             int SP_ITERATION = -1;
             int VP_ITERATION = -1;
+            int FA_ITERATION = -1;
             int change_mix_iteration = -1;
             for(int iteration=1;iteration<=MAX_ITERATIONS;iteration++){
 
@@ -982,15 +1114,69 @@ public class HTKLabeler extends VoiceImportComponent {
                     }
                 }
 
+                ///-----------------
+                if(PHASE_NUMBER==2){ 
+                    if(iteration == (FA_ITERATION+1)){
+                    	 String logfile= "log_hviteMultiplePronunciationAligning_"+iteration+".txt";
+                    	 String labDir = "'*'";//getProp(HTDIR)+File.separator+"lab";
+                    	 String alignedMlf = getProp(HTDIR)+File.separator+"aligned_words.mlf";
+                    	 hviteMultiplePronunciationAligning("hmm"+(iteration-1),alignedMlf, false, labDir, true, logfile);
+                         phoneMlf = getProp(HTDIR)+File.separator
+                                 +"aligned_words.mlf";
+                         
+                         System.out.println("Copy hmm"+(iteration-1)+ " in " +"hmm"+iteration);
+                         String oldMacro = hmmDir+"hmm"+(iteration-1)+File.separator+"macros";
+                         String newMacro = hmmDir+"hmm"+iteration+File.separator+"macros";
+                         FileUtils.copy(oldMacro,newMacro);
+                         String oldHmmdefs = hmmDir+"hmm"+(iteration-1)+File.separator+"hmmdefs";
+                         String newHmmdefs = hmmDir+"hmm"+iteration+File.separator+"hmmdefs";
+                         FileUtils.copy(oldHmmdefs, newHmmdefs);
+                         
+                         // copy of logProbFrame_array in current iteration 
+                         logProbFrame_array.add(logProbFrame_array.get(iteration-2));
+                         epsilon_array.add(100000000.0);
+                        //now we enter in PHASE 3
+                        PHASE_NUMBER  = 3;
+                        System.out.println("Now we enter in PHASE:" + PHASE_NUMBER);
+                        
+                        continue;
+                    }
+                   
+                    // check epsilon_array  
+                    if(epsilon_array.get(iteration-2) < epsilon_PHASE[PHASE_NUMBER]  || iteration == MAX_FA_ITERATION){
+                    	FA_ITERATION = iteration;
+                    	
+                    	 System.out.println("Copy hmm"+(iteration-1)+ " in " +"hmm"+iteration);
+                         String oldMacro = hmmDir+"hmm"+(iteration-1)+File.separator+"macros";
+                         String newMacro = hmmDir+"hmm"+iteration+File.separator+"macros";
+                         FileUtils.copy(oldMacro,newMacro);
+                         String oldHmmdefs = hmmDir+"hmm"+(iteration-1)+File.separator+"hmmdefs";
+                         String newHmmdefs = hmmDir+"hmm"+iteration+File.separator+"hmmdefs";
+                         FileUtils.copy(oldHmmdefs, newHmmdefs);
+                    
+                        // copy of logProbFrame_array in current iteration 
+                        logProbFrame_array.add(logProbFrame_array.get(iteration-2));
+                        epsilon_array.add(100000000.0);
+                        continue;
+                    }
+                }
+
                 
                 ///-----------------
-                if(PHASE_NUMBER==2){
+                if(PHASE_NUMBER==3){
                     // check epsilon_array  
                     // the following change_mix_iteration + 2 is used to allow more than one re-estimation after insertion of new mixture
                     // Because just after the insertion the delta can be negative 
 
                     if(((iteration != change_mix_iteration + 2) && (epsilon_array.get(iteration-2) < epsilon_PHASE[PHASE_NUMBER])) || iteration == MAX_MIX_ITERATION){
-                        change_mix_iteration =  iteration;
+                    	
+                    	System.out.println("Condition = true: " + "iteration=" + iteration + " change_mix_iteration="+ change_mix_iteration 
+                    			+ " epsilon_array.get(iteration-2)=" + epsilon_array.get(iteration-2)
+                    			+ " epsilon_PHASE[PHASE_NUMBER]=" + epsilon_PHASE[PHASE_NUMBER] 
+                    			+ " MAX_MIX_ITERATION"	+ MAX_MIX_ITERATION);
+                    	
+                    	
+                    	change_mix_iteration =  iteration;
                         MAX_MIX_ITERATION = -1;
                         
                         // Creating Increasing mixture config file dynamic iteration
@@ -1023,8 +1209,15 @@ public class HTKLabeler extends VoiceImportComponent {
                             //logProbFrame_array.add(logProbFrame_array.get(iteration-2));
                             //epsilon_array.add(100000000.0);
                             //now we enter in PHASE 3
-                            PHASE_NUMBER  = 3;
+                            PHASE_NUMBER = PHASE_NUMBER+1;
                             System.out.println("Now we enter in PHASE:" + PHASE_NUMBER);
+                            String logfile= "log_hviteMultiplePronunciationAligning_"+iteration+".txt";
+                            String labDir = "'*'";//getProp(HTDIR)+File.separator+"lab";
+                            String alignedMlf = getProp(HTDIR)+File.separator+"aligned_words.mlf";
+                            hviteMultiplePronunciationAligning("hmm"+(iteration-1), alignedMlf, false, labDir, true, logfile);
+                            phoneMlf = getProp(HTDIR)+File.separator
+                                    +"aligned_words.mlf";
+                            
                             //continue;
                         }
 
@@ -1059,7 +1252,7 @@ public class HTKLabeler extends VoiceImportComponent {
                 }
 
                 ///-----------------
-                if(PHASE_NUMBER==3){
+                if(PHASE_NUMBER==4){
                     // check epsilon_array
                     if(((iteration != change_mix_iteration + 2) && (epsilon_array.get(iteration-2) < epsilon_PHASE[PHASE_NUMBER])) || iteration == MAX_ITERATIONS)
                         {
@@ -1314,7 +1507,7 @@ public class HTKLabeler extends VoiceImportComponent {
         
         /*
          * Add sp model copying the 3 states of ssil
-         * remeber to use appropiate AT and TI 
+         * remember to use appropriate AT and TI 
          */
         private void insertVirtualPauseThreeStates(int i) throws Exception{
             String hmmDir = getProp(HTDIR)+File.separator
@@ -1386,7 +1579,110 @@ public class HTKLabeler extends VoiceImportComponent {
         
         
         
-        
+        /**
+         * Force Align database for Automatic labels 
+         * @throws Exception
+         */
+        private void  hviteMultiplePronunciationAligning(String hmmNumber, String alignedMlf, boolean labOutput, String labDir,  boolean full, String logfile) throws Exception{
+            
+            String hvite = getProp(HTKDIR)+File.separator+"HVite"; // -A -D -V -T 1 "; // to add -A -D -V -T 1 in every function
+            File htkFile = new File(hvite);
+            if (!htkFile.exists()) {
+                throw new RuntimeException("File "+htkFile.getAbsolutePath()+" does not exist");
+            }
+            String configFile = getProp(HTDIR)+File.separator
+                +"config"+File.separator+"htkTrain.conf";
+            String listFile = getProp(HTDIR)+File.separator
+                +"etc"+File.separator+"htkTrain.list";
+            
+            // Virtual sp change_ phoneList should be a member? 
+            // Without sp: 
+            /*String phoneList = getProp(HTDIR)+File.separator
+                +"etc"+File.separator+"htk.phone2.list";*/
+            
+            // Whit sp:
+            
+            String phoneList = getProp(HTDIR)+File.separator
+                    +"etc"+File.separator+"htk.phone3.list";
+                
+            
+            String hmmDef = getProp(HTDIR)+File.separator
+                +"hmm"+File.separator
+                +hmmNumber+File.separator+"hmmdefs";
+            String macros = getProp(HTDIR)+File.separator
+                +"hmm"+File.separator
+                +hmmNumber+File.separator+"macros";
+         
+            // Virtual sp change_ phoneMlf should be a member?
+            
+            // Without sp: 
+            /*String phoneMlf = getProp(HTDIR)+File.separator
+                +"etc"+File.separator+"htk.phones2.mlf";*/
+            // Whit sp:
+            String phoneMlf = getProp(HTDIR)+File.separator
+                    +"etc"+File.separator+"htk.words3.mlf";
+
+            
+            
+            String phoneDict = getProp(HTDIR)+File.separator
+                +"etc"+File.separator+"htk.words.dict";
+            
+            
+            Runtime rtime = Runtime.getRuntime();
+            //get a shell
+            Process process = rtime.exec("/bin/bash");
+            //get an output stream to write to the shell
+            
+            //when no sp use (-m)!
+            String cmd;
+            
+            String alignout, mOptioon;
+            
+            if (labOutput)
+            	alignout = "";
+            else
+            	alignout= " -i "+alignedMlf;
+            
+            if (full) {
+            	if (labOutput)
+            		mOptioon = "";
+            	else
+            		mOptioon =  " -m";
+            	
+            	cmd="( cd "+getProp(HTDIR) +"; "
+                    +hvite+" " + HTK_SO + " -b sil -l "+labDir+" -C "+configFile
+                    +mOptioon+" -a -H "+macros+" -H "+hmmDef+alignout+" -t 250.0 -y lab" 
+                    +" -I "+phoneMlf+" -S "+listFile
+                    +" "+phoneDict+" "+phoneList +" > "+logfile 
+                    +"; exit )\n";
+            } else 
+            {
+            	cmd="( cd "+getProp(HTDIR) +"; "
+                        +hvite+" " + HTK_SO + " -b sil -l "+labDir+" -o W -C "+configFile
+                        +" -m -a -H "+macros+" -H "+hmmDef+alignout+" -t 250.0 -y lab" 
+                        +" -I "+phoneMlf+" -S "+listFile
+                        +" "+phoneDict+" "+phoneList +" > "+logfile 
+                        +"; exit )\n";
+            }
+            
+            
+            PrintWriter pw = new PrintWriter(
+                    new OutputStreamWriter(process.getOutputStream()));
+            System.out.println(cmd);
+            pw.println(cmd);
+            
+            pw.flush();
+            //shut down
+            pw.close();
+            process.waitFor();
+             // check exit value
+            if (process.exitValue() != 0) {
+                BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
+                throw new MaryConfigurationException(errorReader.readLine());
+            }
+            
+            
+        }
         
         
         
@@ -1593,16 +1889,24 @@ public class HTKLabeler extends VoiceImportComponent {
                     new FileOutputStream (new File(outputDir+"/"+"htk.phones2.mlf")));
             PrintWriter transLabelOut2 = new PrintWriter(
                     new FileOutputStream (new File(outputDir+"/"+"htk.phones3.mlf")));
+         // word 
+            PrintWriter transLabelOut3 = new PrintWriter(
+                    new FileOutputStream (new File(outputDir+"/"+"htk.words3.mlf")));
 
             
-            String phoneSeq; 
+            
+            String phoneSeq;
+            String wordSeq;
+            
             transLabelOut.println("#!MLF!#");
             transLabelOut1.println("#!MLF!#");
             transLabelOut2.println("#!MLF!#");
+            transLabelOut3.println("#!MLF!#");
             for (int i=0; i<bnl.getLength(); i++) {
                 transLabelOut.println("\"*/"+bnl.getName(i)+labExt+"\"");
                 transLabelOut1.println("\"*/"+bnl.getName(i)+labExt+"\"");
                 transLabelOut2.println("\"*/"+bnl.getName(i)+labExt+"\"");
+                transLabelOut3.println("\"*/"+bnl.getName(i)+labExt+"\"");
                 //phoneSeq = getSingleLine(bnl.getName(i));
                 phoneSeq = getLineFromXML(bnl.getName(i), false, false);
                 transLabelOut.println(phoneSeq.trim());
@@ -1610,7 +1914,11 @@ public class HTKLabeler extends VoiceImportComponent {
                 transLabelOut1.println(phoneSeq.trim());
                 phoneSeq = getLineFromXML(bnl.getName(i), true, true);
                 transLabelOut2.println(phoneSeq.trim());
+                // word 
+                wordSeq = getWordLineFromXML(bnl.getName(i), true, true);
+                transLabelOut3.println(wordSeq.trim());
 
+                
                 //System.out.println( "    " + bnl.getName(i) );
                            
             }
@@ -1620,6 +1928,8 @@ public class HTKLabeler extends VoiceImportComponent {
             transLabelOut1.close();
             transLabelOut2.flush();
             transLabelOut2.close();
+            transLabelOut3.flush();
+            transLabelOut3.close();
         }
         
         
@@ -1693,6 +2003,74 @@ public class HTKLabeler extends VoiceImportComponent {
             return phoneSeq;
         }
         
+        
+        private String getWordLineFromXML(String basename, boolean spause, boolean vpause) throws Exception {
+            
+            String line;
+            String phoneSeq;
+            Matcher matcher;
+            Pattern pattern;
+            StringBuilder alignBuff = new StringBuilder();
+            //alignBuff.append(basename);
+            DocumentBuilderFactory factory  = DocumentBuilderFactory.newInstance();
+            DocumentBuilder builder  = factory.newDocumentBuilder();
+            Document doc = builder.parse( new File( getProp(PROMPTALLOPHONESDIR)+"/"+basename+xmlExt ) );
+            XPath xpath = XPathFactory.newInstance().newXPath();
+            NodeList tokens = (NodeList) xpath.evaluate("//t | //boundary", doc, XPathConstants.NODESET);
+            
+            alignBuff.append(collectWordTranscription(tokens));
+            phoneSeq = alignBuff.toString();
+            pattern = Pattern.compile("pau ssil ");
+            matcher = pattern.matcher(phoneSeq);
+            phoneSeq = matcher.replaceAll("sil ");
+            
+            pattern = Pattern.compile(" ssil pau$");
+            matcher = pattern.matcher(phoneSeq);
+            phoneSeq = matcher.replaceAll(" sil");
+            
+            if(!vpause){
+            /* TODO: Extra code need to write
+             * to maintain minimum number of short sil.
+             * or consider word boundaries as ssil.
+             */
+            /* 
+             * virtual silence on word boundaries
+             * are matched in sp  
+             */
+            pattern = Pattern.compile("vssil");
+            matcher = pattern.matcher(phoneSeq);
+            phoneSeq = matcher.replaceAll("");
+            } else
+            {
+                /* 
+                 * virtual silence on word boundaries
+                 * are matched in sp  
+                 */
+                pattern = Pattern.compile("vssil");
+                matcher = pattern.matcher(phoneSeq);
+                phoneSeq = matcher.replaceAll("");
+            }
+            
+            // checking
+            if(!spause){
+                pattern = Pattern.compile("ssil");
+                matcher = pattern.matcher(phoneSeq);
+                phoneSeq = matcher.replaceAll("");
+            }
+            
+            phoneSeq += " .";
+            
+            pattern = Pattern.compile("\\s+");
+            matcher = pattern.matcher(phoneSeq);
+            phoneSeq = matcher.replaceAll("\n");
+            
+            //System.out.println(phoneSeq);
+            return phoneSeq;
+        }
+        
+        
+        
+        
         /**
          * 
          * This computes a string of phonetic symbols out of an prompt allophones mary xml:
@@ -1760,6 +2138,107 @@ public class HTKLabeler extends VoiceImportComponent {
             orig += "pau";
             return orig;
         }
+        
+        /**
+         * 
+         * This computes a string of words out of an prompt allophones mary xml:
+         * - standard phones are taken from "ph" attribute
+         * @param tokens
+         * @return
+         */
+        private String collectWordTranscription(NodeList tokens) {
+            
+            // TODO: make delims argument
+            // String Tokenizer devides transcriptions into syllables
+            // syllable delimiters and stress symbols are retained
+            String delims = "',-";
+            
+            // String storing the original transcription begins with a pause
+            String orig =  " pau " ;
+            String HTKWORD_xml_transcription;
+            String HTKWORD, word;
+            
+            // get original phone String
+            for (int tNr = 0; tNr < tokens.getLength() ; tNr++ ){
+                
+                Element token = (Element) tokens.item(tNr);
+       
+
+             // only look at it if there is a sampa to change
+                if ( token.hasAttribute("ph") ){                   
+                	HTKWORD_xml_transcription =  "";
+                    String sampa = token.getAttribute("ph");
+        
+                    List<String> sylsAndDelims = new ArrayList<String>();
+                    StringTokenizer sTok = new StringTokenizer(sampa, delims, true);
+                    
+                    while(sTok.hasMoreElements()){
+                        String currTok = sTok.nextToken();
+                        
+                        if (delims.indexOf(currTok) == -1) {
+                            // current Token is no delimiter
+                            for (Allophone ph : allophoneSet.splitIntoAllophones(currTok)){
+                                // orig += ph.name() + " ";
+                                 if(ph.name().trim().equals("_")) continue;
+                                HTKWORD_xml_transcription += replaceTrickyPhones(ph.name().trim()) + " ";
+                        	    //globalwordlexicon += HTKWORD + " " + HTKWORD_xml_transcription;                             
+                                
+                            }// ... for each phone
+                        }// ... if no delimiter
+                    }// ... while there are more tokens
+                    
+                    
+                    word= token.getTextContent().trim();
+                    HTKWORD = word.toUpperCase();
+                    
+                    HTKWORD_xml_transcription = HTKWORD_xml_transcription.trim();
+                    // dictionary
+                    //System.out.println("HTKWORD: "  + HTKWORD + " HTKWORD_xml_transcription: "  + HTKWORD_xml_transcription);
+                    HTKdictionary.add(HTKWORD + " " + HTKWORD_xml_transcription);
+
+                    
+                    String[] entries;
+                    entries = lexicon.lookup(word);
+                    //insert here all the different possible transcriptions                    
+                    for (int i = 0; i< entries.length; i++)
+                    {
+                    	String HTKTranscription = entries[i];
+                    	HTKTranscription = HTKTranscription.replace("' ","" );
+                    	HTKTranscription = HTKTranscription.replace("- ","" );
+                    	HTKdictionary.add(HTKWORD + " " + HTKTranscription);
+                    }
+                    
+                    orig += HTKWORD  + " ";
+                    
+                }
+                
+                
+                
+                
+                // TODO: simplify
+                if ( token.getTagName().equals("t") ){
+                                    
+                    // if the following element is no boundary, insert a non-pause delimiter
+                    if (tNr == tokens.getLength()-1 || 
+                        !((Element) tokens.item(tNr+1)).getTagName().equals("boundary") ){
+                            orig += "vssil "; // word boundary
+                            
+                        }
+                                                           
+                } else if ( token.getTagName().equals("boundary")){
+                                    
+                        orig += "ssil "; // phrase boundary
+
+                } else {
+                    // should be "t" or "boundary" elements
+                    assert(false);
+                }
+                            
+            }// ... for each t-Element
+            orig += "pau";
+            return orig;
+        }
+        
         
         /**
          * Post Processing single Label file 
@@ -1866,24 +2345,38 @@ public class HTKLabeler extends VoiceImportComponent {
                     if (dur == 0) {
                         //System.out.println("sp to delete!!!");
                         continue;
-                    } 
+                    }
                     
                     /*else if (dur <= 150000) //150000 = 15 ms 
                     { 
                       //TODO: A better post processing should be done: i.e. check the previous and the next phone ...
                         System.out.println("sp <= 15 ms to delete!!!");
-                       continue; 
+                        continue;
                     }*/
                     else{
                         System.out.println(fileName + ": a sp (virtual) pause with duration: "+ durms +" ms, has been detected at "+ tStart + " " + tStamp );
                         /*
-                         * The following gawk lines cab be used to inspect very long sp pause: 
+                         * The following gawk lines can be used to inspect very long sp pause: 
                          * gawk 'match($0, /^(.*): a sp.*duration: ([0-9]+\.[0-9]+) ms.*$/, arr) {if (arr[2]>200) {print "file:" arr[1] " duration:" arr[2]} }' nohup.out
                          * gawk 'match($0, /^(.*): a sp.*duration: ([0-9]+\.[0-9]+) ms.*$/, arr) {if (arr[2]>400) {print $0} }' nohup.out
                          */
                         
                     }
                     
+                } else if (phoneSeg.equals("ssil")) {
+                	 if (dur == 0) {
+			    System.out.println(fileName + ": ssil to delete!!! a ssil (pause associated with punctuation) with duration: "+ durms +" ms, has been detected at "+ tStart + " " + tStamp );
+                            continue;
+                         } 
+                	
+                	 else{
+                         System.out.println(fileName + ": a ssil (pause associated with punctuation) with duration: "+ durms +" ms, has been detected at "+ tStart + " " + tStamp );
+                         /*
+                          * The following gawk lines can be used to inspect very short ssil pause: 
+                          * gawk 'match($0, /^(.*): a ssil.*duration: ([0-9]+\.[0-9]+) ms.*$/, arr) {if (arr[2]>200) {print "file:" arr[1] " duration:" arr[2]} }' nohup.out
+                          * gawk 'match($0, /^(.*): a ssil.*duration: ([0-9]+\.[0-9]+) ms.*$/, arr) {if (arr[2]>400) {print $0} }' nohup.out
+                          */
+                     }
                 }
                    
                 if (phoneSeg.equals("sil") || phoneSeg.equals("ssil") || phoneSeg.equals("sp"))
