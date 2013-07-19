@@ -20,8 +20,11 @@
 package marytts.modules;
 
 import java.io.BufferedReader;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -32,6 +35,8 @@ import java.util.StringTokenizer;
 import marytts.datatypes.MaryData;
 import marytts.datatypes.MaryDataType;
 import marytts.datatypes.MaryXML;
+import marytts.exceptions.MaryConfigurationException;
+import marytts.exceptions.NoSuchPropertyException;
 import marytts.server.MaryProperties;
 import marytts.util.MaryUtils;
 import marytts.util.dom.MaryDomUtils;
@@ -52,7 +57,7 @@ import org.w3c.dom.traversal.TreeWalker;
 
 public class OpenNLPPosTagger extends InternalModule
 {
-    private String propertyPrefix;
+    protected String propertyPrefix;
     protected POSTaggerME tagger;
     protected Map<String,String> posMapper = null;
 
@@ -77,12 +82,20 @@ public class OpenNLPPosTagger extends InternalModule
     public void startup() throws Exception
     {
         super.startup();
-        
-        InputStream modelStream = MaryProperties.needStream(propertyPrefix+"model");
-        InputStream posMapperStream = MaryProperties.getStream(propertyPrefix+"posMap");
-
+        assignPOSTagger();
+        setupPosMapper();
+    }
+    
+    
+    protected void assignPOSTagger() throws NoSuchPropertyException, MaryConfigurationException, IOException
+    {
+    	InputStream modelStream = MaryProperties.needStream(propertyPrefix+"model");
         tagger = new POSTaggerME(new POSModel(modelStream));
         modelStream.close();
+    }
+    
+    protected void setupPosMapper() throws MaryConfigurationException, IOException{
+    	InputStream posMapperStream = MaryProperties.getStream(propertyPrefix+"posMap");
         if (posMapperStream != null) {
             posMapper = new HashMap<String, String>();
             BufferedReader br = new BufferedReader(new InputStreamReader(posMapperStream, "UTF-8"));
@@ -97,7 +110,7 @@ public class OpenNLPPosTagger extends InternalModule
                 posMapper.put(pos, gpos);
             }
             posMapperStream.close();
-        }
+        }	
     }
 
     @SuppressWarnings("unchecked")
