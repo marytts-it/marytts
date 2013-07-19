@@ -288,24 +288,32 @@ public class HTKLabeler extends VoiceImportComponent {
             String logfile= "log_hviteMultiplePronunciationAligning_"+"final-full"+".txt";
             String labDir = getProp(HTDIR)+File.separator+"lab";
             String alignedMlf = getProp(HTDIR)+File.separator+"aligned_full_final.mlf";
-            hviteMultiplePronunciationAligning("hmm"+"-final", alignedMlf, false, labDir, true, logfile);
+            hviteMultiplePronunciationAligning("hmm"+"-final", alignedMlf, false, labDir, true, logfile, false);
             
             logfile= "log_hviteMultiplePronunciationAligning_"+"final-phones"+".txt";
             alignedMlf = getProp(HTDIR)+File.separator+"aligned.mlf";
-            hviteMultiplePronunciationAligning("hmm"+"-final", alignedMlf, false, labDir, false, logfile);
+            hviteMultiplePronunciationAligning("hmm"+"-final", alignedMlf, false, labDir, false, logfile, false);
             
             // write the lab files
             logfile= "log_hviteMultiplePronunciationAligning_"+"final-full2"+".txt";
             alignedMlf = "";
             labDir = getProp(HTDIR)+File.separator+"htk-full"+File.separator+"wrd";
-            hviteMultiplePronunciationAligning("hmm"+"-final", alignedMlf, true, labDir, true, logfile);
+            hviteMultiplePronunciationAligning("hmm"+"-final", alignedMlf, true, labDir, true, logfile, false);
             
          
             logfile= "log_hviteMultiplePronunciationAligning_"+"final-phones"+".txt";
             alignedMlf = "";
             labDir = getProp(HTDIR)+File.separator+"htk-full"+File.separator+"lab";
-            hviteMultiplePronunciationAligning("hmm"+"-final", alignedMlf, true, labDir, false, logfile);
+            hviteMultiplePronunciationAligning("hmm"+"-final", alignedMlf, true, labDir, false, logfile, false);
             
+            // to compare with the original pronunciations ()
+            logfile= "log_hviteMultiplePronunciationAligning_"+"final-phones_compare"+".txt";
+            alignedMlf = getProp(HTDIR)+File.separator+"aligned_compare.mlf";
+            labDir = "'*'";
+            hviteMultiplePronunciationAligning("hmm"+"-final", alignedMlf, false, labDir, false, logfile, true);
+            delete_multiple_sp_in_PhoneMLFile(alignedMlf, alignedMlf+".norepetition");
+            System.out.println("To check the recognized multiple pronunctions it is possible to make a comparision between " + 
+            getProp(HTDIR)+File.separator+"etc"+File.separator+"htk.phones3.mlf"+ " and " + alignedMlf+".norepetition");
             
             
             System.out.println("... Done.");
@@ -548,6 +556,7 @@ public class HTKLabeler extends VoiceImportComponent {
             pw.println("ME sil sp sil");
             pw.println("ME ssil ssil sp");
             pw.println("ME ssil sp ssil");
+            pw.println("ME sil sil sil");
             pw.flush();
             pw.close();
 
@@ -1120,7 +1129,7 @@ public class HTKLabeler extends VoiceImportComponent {
                     	 String logfile= "log_hviteMultiplePronunciationAligning_"+iteration+".txt";
                     	 String labDir = "'*'";//getProp(HTDIR)+File.separator+"lab";
                     	 String alignedMlf = getProp(HTDIR)+File.separator+"aligned_words.mlf";
-                    	 hviteMultiplePronunciationAligning("hmm"+(iteration-1),alignedMlf, false, labDir, true, logfile);
+                    	 hviteMultiplePronunciationAligning("hmm"+(iteration-1),alignedMlf, false, labDir, true, logfile,  false);
                          phoneMlf = getProp(HTDIR)+File.separator
                                  +"aligned_words.mlf";
                          
@@ -1214,7 +1223,7 @@ public class HTKLabeler extends VoiceImportComponent {
                             String logfile= "log_hviteMultiplePronunciationAligning_"+iteration+".txt";
                             String labDir = "'*'";//getProp(HTDIR)+File.separator+"lab";
                             String alignedMlf = getProp(HTDIR)+File.separator+"aligned_words.mlf";
-                            hviteMultiplePronunciationAligning("hmm"+(iteration-1), alignedMlf, false, labDir, true, logfile);
+                            hviteMultiplePronunciationAligning("hmm"+(iteration-1), alignedMlf, false, labDir, true, logfile, false);
                             phoneMlf = getProp(HTDIR)+File.separator
                                     +"aligned_words.mlf";
                             
@@ -1583,7 +1592,7 @@ public class HTKLabeler extends VoiceImportComponent {
          * Force Align database for Automatic labels 
          * @throws Exception
          */
-        private void  hviteMultiplePronunciationAligning(String hmmNumber, String alignedMlf, boolean labOutput, String labDir,  boolean full, String logfile) throws Exception{
+        private void  hviteMultiplePronunciationAligning(String hmmNumber, String alignedMlf, boolean labOutput, String labDir,  boolean full, String logfile, boolean cmp) throws Exception{
             
             String hvite = getProp(HTKDIR)+File.separator+"HVite"; // -A -D -V -T 1 "; // to add -A -D -V -T 1 in every function
             File htkFile = new File(hvite);
@@ -1636,7 +1645,7 @@ public class HTKLabeler extends VoiceImportComponent {
             //when no sp use (-m)!
             String cmd;
             
-            String alignout, mOptioon;
+            String alignout, mOptioon, oOption;
             
             if (labOutput)
             	alignout = "";
@@ -1657,8 +1666,13 @@ public class HTKLabeler extends VoiceImportComponent {
                     +"; exit )\n";
             } else 
             {
+            	if (cmp)
+            		oOption = " -o WTS";
+            	else
+            		oOption = " -o W";
+            	
             	cmd="( cd "+getProp(HTDIR) +"; "
-                        +hvite+" " + HTK_SO + " -b sil -l "+labDir+" -o W -C "+configFile
+                        +hvite+" " + HTK_SO + " -b sil -l "+labDir+oOption+ " -C "+configFile
                         +" -m -a -H "+macros+" -H "+hmmDef+alignout+" -t 250.0 -y lab" 
                         +" -I "+phoneMlf+" -S "+listFile
                         +" "+phoneDict+" "+phoneList +" > "+logfile 
