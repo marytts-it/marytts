@@ -1,10 +1,17 @@
 package marytts.language.it;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import opennlp.tools.postag.POSDictionary;
+import opennlp.tools.postag.POSModel;
+import opennlp.tools.postag.TagDictionary;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -13,6 +20,9 @@ import org.w3c.dom.traversal.TreeWalker;
 
 import marytts.datatypes.MaryData;
 import marytts.datatypes.MaryXML;
+import marytts.exceptions.MaryConfigurationException;
+import marytts.exceptions.NoSuchPropertyException;
+import marytts.server.MaryProperties;
 import marytts.util.dom.MaryDomUtils;
 
 /*
@@ -22,6 +32,7 @@ import marytts.util.dom.MaryDomUtils;
  */
 public class OpenNLPPosTagger extends marytts.modules.OpenNLPPosTagger {
 
+	
 	private Pattern uppercase_part;
 	
 	public OpenNLPPosTagger(String locale, String propertyPrefix)
@@ -31,7 +42,22 @@ public class OpenNLPPosTagger extends marytts.modules.OpenNLPPosTagger {
 		// Regular expression to split the uppercase part from the other one
 		uppercase_part = Pattern.compile("([A-Z]+)([^A-Z]+)");
 	}
+	
+  
+	protected void assignPOSTagger() throws NoSuchPropertyException, MaryConfigurationException, IOException
+	{
+	    	InputStream modelStream = MaryProperties.needStream(propertyPrefix+"model");
+			ItalianPOSTaggerFactory factory = new ItalianPOSTaggerFactory();
 
+			InputStream deterministic_symbols_tagdict_Stream = MaryProperties.needStream(propertyPrefix+"deterministic_symbols_tagdict");
+			// case sensitiveness? POSDictionary.create does not take into account... or take this automaticcaly into account? 
+			TagDictionary deterministic_symbols_tagdict = POSDictionary.create(deterministic_symbols_tagdict_Stream);
+            
+	        tagger = new ItalianPOSTaggerME(new POSModel(modelStream), factory.getSequenceValidator(deterministic_symbols_tagdict));
+	        
+	        modelStream.close();
+	}
+	
 	@SuppressWarnings("unchecked")
 	public MaryData process(MaryData d) throws Exception {
 
