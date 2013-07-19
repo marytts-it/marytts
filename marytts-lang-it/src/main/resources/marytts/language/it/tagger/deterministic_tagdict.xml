@@ -8,49 +8,19 @@ In this case the tags corresponds to the symbol and token corresponds to the lab
 
 <dictionary case_sensitive="false">
 <!-- FB « » ( ) " ' -->
-<entry tags="«">
-<token>FB</token>
-</entry>
-<entry tags="»">
-<token>FB</token>
-</entry>
-<entry tags="(">
-<token>FB</token>
-</entry>
-<entry tags=")">
-<token>FB</token>
-</entry>
-<entry tags='"'>
-<token>FB</token>
-</entry>
-<entry tags="'">
+<entry tags="« » ( ) &quot; '">
 <token>FB</token>
 </entry>
 <!-- FC : ; - -->
-<entry tags=":">
-<token>FC</token>
-</entry>
-<entry tags=";">
-<token>FC</token>
-</entry>
-<entry tags="-">
+<entry tags=": ; -">
 <token>FC</token>
 </entry>
 <!-- FF , ... -->
-<entry tags=",">
-<token>FF</token>
-</entry>
-<entry tags="...">
+<entry tags=", ...">
 <token>FF</token>
 </entry>
 <!-- FS . ? ! -->
-<entry tags=".">
-<token>FS</token>
-</entry>
-<entry tags="?">
-<token>FS</token>
-</entry>
-<entry tags="!">
+<entry tags=". ? !">
 <token>FS</token>
 </entry>
 </dictionary>

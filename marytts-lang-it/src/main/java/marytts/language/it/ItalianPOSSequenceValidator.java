@@ -71,7 +71,7 @@ public class ItalianPOSSequenceValidator implements SequenceValidator<String> {
 			// OK the det_tagDictionary contains the correct input sequence
 			// (i.e. ",") or tags == null
 			// check for normal tag dict
-		} 
+		}
 		if (tagDictionary == null) {
 			System.out.println("tagDictionary = null");
 			return true;
