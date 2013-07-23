@@ -2179,7 +2179,7 @@ public class HTKLabeler extends VoiceImportComponent {
        
 
              // only look at it if there is a sampa to change
-                if ( token.hasAttribute("ph") ){                   
+                if ( token.hasAttribute("ph") ){
                 	HTKWORD_xml_transcription =  "";
                     String sampa = token.getAttribute("ph");
         
@@ -2205,9 +2205,22 @@ public class HTKLabeler extends VoiceImportComponent {
                     word= token.getTextContent().trim();
                     HTKWORD = word.toUpperCase();
                     
+                    
+                    	
+                    
+                    
                     HTKWORD_xml_transcription = HTKWORD_xml_transcription.trim();
+                    
+                    if ((token.hasAttribute("g2p_method") && token.getAttribute("g2p_method").equals("privatedict")) 
+                    		// this is for rawxml entry with token with ph attribute 
+                    		|| !token.hasAttribute("g2p_method")) {
+                    	HTKWORD = HTKWORD + "_" + HTKWORD_xml_transcription.replaceAll(" ", "");
+                    	System.out.println("HTKWORD private lexicon or rawxml ph: " + HTKWORD);
+                    }
+                    
+                    
                     // dictionary
-                    //System.out.println("HTKWORD: "  + HTKWORD + " HTKWORD_xml_transcription: "  + HTKWORD_xml_transcription);
+                    System.out.println("HTKWORD: "  + HTKWORD + " HTKWORD_xml_transcription: "  + HTKWORD_xml_transcription);
                     HTKdictionary.add(HTKWORD + " " + HTKWORD_xml_transcription);
 
                     
