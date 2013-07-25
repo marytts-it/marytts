@@ -312,7 +312,7 @@ public class HTKLabeler extends VoiceImportComponent {
             labDir = "'*'";
             hviteMultiplePronunciationAligning("hmm"+"-final", alignedMlf, false, labDir, false, logfile, true);
             delete_multiple_sp_in_PhoneMLFile(alignedMlf, alignedMlf+".norepetition");
-            System.out.println("To check the recognized multiple pronunctions it is possible to make a comparision between " + 
+            System.out.println("To check the recognized multiple pronunciations it is possible to make a comparision between " + 
             getProp(HTDIR)+File.separator+"etc"+File.separator+"htk.phones3.mlf"+ " and " + alignedMlf+".norepetition");
             
             
@@ -2215,12 +2215,12 @@ public class HTKLabeler extends VoiceImportComponent {
                     		// this is for rawxml entry with token with ph attribute 
                     		|| !token.hasAttribute("g2p_method")) {
                     	HTKWORD = HTKWORD + "_" + HTKWORD_xml_transcription.replaceAll(" ", "");
-                    	System.out.println("HTKWORD private lexicon or rawxml ph: " + HTKWORD);
+                    	//System.out.println("HTKWORD private lexicon or rawxml ph: " + HTKWORD);
                     }
                     
                     
                     // dictionary
-                    System.out.println("HTKWORD: "  + HTKWORD + " HTKWORD_xml_transcription: "  + HTKWORD_xml_transcription);
+                    //System.out.println("HTKWORD: "  + HTKWORD + " HTKWORD_xml_transcription: "  + HTKWORD_xml_transcription);
                     HTKdictionary.add(HTKWORD + " " + HTKWORD_xml_transcription);
 
                     
