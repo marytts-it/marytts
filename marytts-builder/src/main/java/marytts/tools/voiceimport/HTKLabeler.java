@@ -22,6 +22,7 @@ package marytts.tools.voiceimport;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -91,6 +92,7 @@ public class HTKLabeler extends VoiceImportComponent {
         protected int percent = 0;
         protected File promtallophonesDir;
         Collection<String> HTKdictionary;
+        Collection<String> Totaldictionary;
         protected FSTLookup lexicon;
         protected AllophoneSet allophoneSet;
         protected int MAX_ITERATIONS = 150;
@@ -179,6 +181,7 @@ public class HTKLabeler extends VoiceImportComponent {
            
            //dictionary = new TreeMap<String, TreeMap<String,String>>(); // Unused?
            HTKdictionary = new TreeSet<String>();
+           Totaldictionary = new TreeSet<String>();
 
            promtallophonesDir = new File(getProp(PROMPTALLOPHONESDIR));
            if (!promtallophonesDir.exists()){
@@ -231,6 +234,7 @@ public class HTKLabeler extends VoiceImportComponent {
             getPhoneSequence();
             
             saveHTKWordDictionary();
+            saveTotalWordDictionary();
 	    
             // This is necessary to remove multiple sp: TODO: implement a loop and check the result 
             delete_multiple_sp_in_PhoneMLFile(getProp(HTDIR) + File.separator + "etc" + File.separator + "htk.phones3.mlf",
@@ -313,7 +317,7 @@ public class HTKLabeler extends VoiceImportComponent {
             hviteMultiplePronunciationAligning("hmm"+"-final", alignedMlf, false, labDir, false, logfile, true);
             delete_multiple_sp_in_PhoneMLFile(alignedMlf, alignedMlf+".norepetition");
             System.out.println("To check the recognized multiple pronunciations it is possible to make a comparision between " + 
-            getProp(HTDIR)+File.separator+"etc"+File.separator+"htk.phones3.mlf"+ " and " + alignedMlf+".norepetition");
+            getProp(HTDIR)+File.separator+"etc"+File.separator+"htk.words_phones3.mlf"+ " and " + alignedMlf+".norepetition");
             
             
             System.out.println("... Done.");
@@ -395,7 +399,21 @@ public class HTKLabeler extends VoiceImportComponent {
                 BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
                 throw new MaryConfigurationException(errorReader.readLine());
             }
-		}
+       }
+       
+       private void saveTotalWordDictionary() throws FileNotFoundException {
+       // total dictionary
+	    String totaldict = outputDir+File.separator+"htk.mary.words0.dict";
+	    PrintWriter wordTotalDictOut = new PrintWriter(
+               new FileOutputStream (new File(totaldict)));
+	   
+	    Iterator<String> itr  = Totaldictionary.iterator();
+	    while(itr.hasNext()){
+	    	wordTotalDictOut.println(itr.next());
+	    }
+	    wordTotalDictOut.flush();
+	    wordTotalDictOut.close();
+	}
 
 	/**
         * Setup the HTK directory
@@ -1667,7 +1685,7 @@ public class HTKLabeler extends VoiceImportComponent {
             } else 
             {
             	if (cmp)
-            		oOption = " -o WTS";
+            		oOption = " -o TS";
             	else
             		oOption = " -o W";
             	
@@ -1903,23 +1921,26 @@ public class HTKLabeler extends VoiceImportComponent {
                     new FileOutputStream (new File(outputDir+"/"+"htk.phones2.mlf")));
             PrintWriter transLabelOut2 = new PrintWriter(
                     new FileOutputStream (new File(outputDir+"/"+"htk.phones3.mlf")));
-         // word 
+         	// words and phones (used to compare the results with multiple pronunctiaons)
+			PrintWriter transLabelOut2b = new PrintWriter(
+                    new FileOutputStream (new File(outputDir+"/"+"htk.words_phones3.mlf")));
+			// words used for multiple pronunciations forced alignement  
             PrintWriter transLabelOut3 = new PrintWriter(
                     new FileOutputStream (new File(outputDir+"/"+"htk.words3.mlf")));
 
-            
-            
             String phoneSeq;
             String wordSeq;
             
             transLabelOut.println("#!MLF!#");
             transLabelOut1.println("#!MLF!#");
             transLabelOut2.println("#!MLF!#");
+            transLabelOut2b.println("#!MLF!#");
             transLabelOut3.println("#!MLF!#");
             for (int i=0; i<bnl.getLength(); i++) {
                 transLabelOut.println("\"*/"+bnl.getName(i)+labExt+"\"");
                 transLabelOut1.println("\"*/"+bnl.getName(i)+labExt+"\"");
                 transLabelOut2.println("\"*/"+bnl.getName(i)+labExt+"\"");
+                transLabelOut2b.println("\"*/"+bnl.getName(i)+labExt+"\"");
                 transLabelOut3.println("\"*/"+bnl.getName(i)+labExt+"\"");
                 //phoneSeq = getSingleLine(bnl.getName(i));
                 phoneSeq = getLineFromXML(bnl.getName(i), false, false);
@@ -1928,7 +1949,12 @@ public class HTKLabeler extends VoiceImportComponent {
                 transLabelOut1.println(phoneSeq.trim());
                 phoneSeq = getLineFromXML(bnl.getName(i), true, true);
                 transLabelOut2.println(phoneSeq.trim());
+                
                 // word 
+                
+                phoneSeq = getWordandPhoneLineFromXML(bnl.getName(i), true, true);
+                transLabelOut2b.println(phoneSeq.trim());
+                
                 wordSeq = getWordLineFromXML(bnl.getName(i), true, true);
                 transLabelOut3.println(wordSeq.trim());
 
@@ -1942,6 +1968,8 @@ public class HTKLabeler extends VoiceImportComponent {
             transLabelOut1.close();
             transLabelOut2.flush();
             transLabelOut2.close();
+            transLabelOut2b.flush();
+            transLabelOut2b.close();
             transLabelOut3.flush();
             transLabelOut3.close();
         }
@@ -2017,7 +2045,86 @@ public class HTKLabeler extends VoiceImportComponent {
             return phoneSeq;
         }
         
-        
+        /**
+         * Get word and phone sequence from a single feature file
+         * @param basename
+         * @return String
+         * @throws Exception
+         */
+        private String getWordandPhoneLineFromXML(String basename, boolean spause, boolean vpause) throws Exception {
+            
+            String line;
+            String phoneSeq;
+            Matcher matcher;
+            Pattern pattern;
+            StringBuilder alignBuff = new StringBuilder();
+            //alignBuff.append(basename);
+            DocumentBuilderFactory factory  = DocumentBuilderFactory.newInstance();
+            DocumentBuilder builder  = factory.newDocumentBuilder();
+            Document doc = builder.parse( new File( getProp(PROMPTALLOPHONESDIR)+"/"+basename+xmlExt ) );
+            XPath xpath = XPathFactory.newInstance().newXPath();
+            NodeList tokens = (NodeList) xpath.evaluate("//t | //boundary", doc, XPathConstants.NODESET);
+            
+            alignBuff.append(collectTranscriptionAndWord(tokens));
+            phoneSeq = alignBuff.toString();
+            pattern = Pattern.compile("pau ssil ");
+            matcher = pattern.matcher(phoneSeq);
+            phoneSeq = matcher.replaceAll("sil ");
+            
+            pattern = Pattern.compile(" ssil pau$");
+            matcher = pattern.matcher(phoneSeq);
+            phoneSeq = matcher.replaceAll(" sil");
+            
+            if(!vpause){
+            /* TODO: Extra code need to write
+             * to maintain minimum number of short sil.
+             * or consider word boundaries as ssil.
+             */
+            /* 
+             * virtual silence on word boundaries
+             * are matched in sp  
+             */
+            pattern = Pattern.compile("vssil");
+            matcher = pattern.matcher(phoneSeq);
+            phoneSeq = matcher.replaceAll("");
+            } else
+            {
+                /* 
+                 * virtual silence on word boundaries
+                 * are matched in sp  
+                 */
+                pattern = Pattern.compile("vssil");
+                matcher = pattern.matcher(phoneSeq);
+                phoneSeq = matcher.replaceAll("sp");
+            }
+            
+            // checking
+            if(!spause){
+                pattern = Pattern.compile("ssil");
+                matcher = pattern.matcher(phoneSeq);
+                phoneSeq = matcher.replaceAll("");
+            }
+            
+            phoneSeq += " .";
+            
+            pattern = Pattern.compile("\\s+");
+            matcher = pattern.matcher(phoneSeq);
+            phoneSeq = matcher.replaceAll("\n");
+            
+            pattern = Pattern.compile("-");
+            matcher = pattern.matcher(phoneSeq);
+            phoneSeq = matcher.replaceAll(" ");
+            
+            //System.out.println(phoneSeq);
+            return phoneSeq;
+        }
+
+         /**
+         * Get word sequence from a single feature file
+         * @param basename
+         * @return String
+         * @throws Exception
+         */
         private String getWordLineFromXML(String basename, boolean spause, boolean vpause) throws Exception {
             
             String line;
@@ -2153,6 +2260,79 @@ public class HTKLabeler extends VoiceImportComponent {
             return orig;
         }
         
+		// word and phones transcriptions
+        private String collectTranscriptionAndWord(NodeList tokens) {
+            
+            // TODO: make delims argument
+            // String Tokenizer devides transcriptions into syllables
+            // syllable delimiters and stress symbols are retained
+            String delims = "',-";
+            
+            // String storing the original transcription begins with a pause
+            String orig =  " pau " ;
+            String word,HTKWORD;
+            boolean first_word_phone = true; 
+            // get original phone String
+            for (int tNr = 0; tNr < tokens.getLength() ; tNr++ ){
+                
+                Element token = (Element) tokens.item(tNr);
+                
+                // only look at it if there is a sampa to change
+                if ( token.hasAttribute("ph") ){
+                	 word= token.getTextContent().trim();
+                     HTKWORD = word.toUpperCase();
+                     first_word_phone = true; 
+                     
+                    String sampa = token.getAttribute("ph");
+        
+                    List<String> sylsAndDelims = new ArrayList<String>();
+                    StringTokenizer sTok = new StringTokenizer(sampa, delims, true);
+                    
+                    while(sTok.hasMoreElements()){
+                        String currTok = sTok.nextToken();
+                        
+                        if (delims.indexOf(currTok) == -1) {
+                            // current Token is no delimiter
+                            for (Allophone ph : allophoneSet.splitIntoAllophones(currTok)){
+                                // orig += ph.name() + " ";
+                                if(ph.name().trim().equals("_")) continue;
+                                orig += replaceTrickyPhones(ph.name().trim()); 
+                                if (first_word_phone){
+                                	orig += "-"+HTKWORD+" ";
+                                	first_word_phone = false;
+                                }
+                                else
+                                	orig += " ";
+                            }// ... for each phone
+                        }// ... if no delimiter
+                    }// ... while there are more tokens    
+                }
+                    
+                // TODO: simplify
+                if ( token.getTagName().equals("t") ){
+                                    
+                    // if the following element is no boundary, insert a non-pause delimiter
+                    if (tNr == tokens.getLength()-1 || 
+                        !((Element) tokens.item(tNr+1)).getTagName().equals("boundary") ){
+                            orig += "vssil "; // word boundary
+                            
+                        }
+                                                           
+                } else if ( token.getTagName().equals("boundary")){
+                                    
+                        orig += "ssil "; // phrase boundary
+
+                } else {
+                    // should be "t" or "boundary" elements
+                    assert(false);
+                }
+                            
+            }// ... for each t-Element
+            orig += "pau";
+            return orig;
+        }
+        
+        
         /**
          * 
          * This computes a string of words out of an prompt allophones mary xml:
@@ -2170,6 +2350,7 @@ public class HTKLabeler extends VoiceImportComponent {
             // String storing the original transcription begins with a pause
             String orig =  " pau " ;
             String HTKWORD_xml_transcription;
+            String mary_transcription;
             String HTKWORD, word;
             
             // get original phone String
@@ -2181,8 +2362,9 @@ public class HTKLabeler extends VoiceImportComponent {
              // only look at it if there is a sampa to change
                 if ( token.hasAttribute("ph") ){
                 	HTKWORD_xml_transcription =  "";
+                	mary_transcription =  "";
                     String sampa = token.getAttribute("ph");
-        
+                    mary_transcription = sampa.trim().replace(" ","");
                     List<String> sylsAndDelims = new ArrayList<String>();
                     StringTokenizer sTok = new StringTokenizer(sampa, delims, true);
                     
@@ -2193,10 +2375,9 @@ public class HTKLabeler extends VoiceImportComponent {
                             // current Token is no delimiter
                             for (Allophone ph : allophoneSet.splitIntoAllophones(currTok)){
                                 // orig += ph.name() + " ";
-                                 if(ph.name().trim().equals("_")) continue;
+                                if(ph.name().trim().equals("_")) continue;
                                 HTKWORD_xml_transcription += replaceTrickyPhones(ph.name().trim()) + " ";
                         	    //globalwordlexicon += HTKWORD + " " + HTKWORD_xml_transcription;                             
-                                
                             }// ... for each phone
                         }// ... if no delimiter
                     }// ... while there are more tokens
@@ -2204,10 +2385,6 @@ public class HTKLabeler extends VoiceImportComponent {
                     
                     word= token.getTextContent().trim();
                     HTKWORD = word.toUpperCase();
-                    
-                    
-                    	
-                    
                     
                     HTKWORD_xml_transcription = HTKWORD_xml_transcription.trim();
                     
@@ -2222,7 +2399,7 @@ public class HTKLabeler extends VoiceImportComponent {
                     // dictionary
                     //System.out.println("HTKWORD: "  + HTKWORD + " HTKWORD_xml_transcription: "  + HTKWORD_xml_transcription);
                     HTKdictionary.add(HTKWORD + " " + HTKWORD_xml_transcription);
-
+                    Totaldictionary.add(HTKWORD + " " + HTKWORD_xml_transcription.replace(" ","") + " " + mary_transcription);
                     
                     String[] entries;
                     entries = lexicon.lookup(word);
@@ -2230,9 +2407,12 @@ public class HTKLabeler extends VoiceImportComponent {
                     for (int i = 0; i< entries.length; i++)
                     {
                     	String HTKTranscription = entries[i];
+                    	mary_transcription = HTKTranscription.replace(" ","");
                     	HTKTranscription = HTKTranscription.replace("' ","" );
                     	HTKTranscription = HTKTranscription.replace("- ","" );
+                    	//TODO: replaceTrickyPhones HTKTranscription
                     	HTKdictionary.add(HTKWORD + " " + HTKTranscription);
+                    	Totaldictionary.add(HTKWORD + " " + HTKTranscription.replace(" ","") + " " + mary_transcription);
                     }
                     
                     orig += HTKWORD  + " ";
